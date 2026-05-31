@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Grove">
+  <title>Grove</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <style>
+    :root {
+      --blue: #007AFF;
+      --green: #34C759;
+      --red: #FF3B30;
+      --orange: #FF9500;
+      --yellow: #FFCC00;
+      --purple: #AF52DE;
+      --gray1: #8E8E93;
+      --gray2: #AEAEB2;
+      --gray3: #C7C7CC;
+      --gray4: #D1D1D6;
+      --gray5: #E5E5EA;
+      --gray6: #F2F2F7;
+      --label: #000000;
+      --label2: rgba(60,60,67,0.6);
+      --label3: rgba(60,60,67,0.3);
+      --bg: #F2F2F7;
+      --card: #FFFFFF;
+      --separator: rgba(60,60,67,0.12);
+      --tab-height: 83px;
+      --safe-top: env(safe-area-inset-top, 44px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+      background: var(--bg);
+      color: var(--label);
+      height: 100dvh;
+      overflow: hidden;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    #app { height: 100dvh; display: flex; flex-direction: column; }
+    #view-container { flex: 1; overflow: hidden; position: relative; }
+    .view { position: absolute; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .view.hidden { display: none; }
+
+    /* ── TAB BAR ── */
+    #tab-bar {
+      height: var(--tab-height);
+      padding-bottom: var(--safe-bottom);
+      background: rgba(255,255,255,0.88);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 0.5px solid var(--separator);
+      display: flex;
+      align-items: flex-start;
+      padding-top: 8px;
+      position: relative;
+      z-index: 100;
+      flex-shrink: 0;
+    }
+    .tab-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      cursor: pointer;
+      padding: 4px 0;
+    }
+    .tab-item:active { opacity: 0.5; }
+    .tab-icon { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    .tab-label { font-size: 10px; font-weight: 500; letter-spacing: -0.2px; color: var(--gray1); }
+    .tab-item.active .tab-label { color: var(--blue); }
+    .tab-add {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      cursor: pointer;
+      padding: 4px 0;
+      margin-top: -20px;
+    }
+    .tab-add-circle {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: var(--blue);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 16px rgba(0,122,255,0.4);
+      font-size: 30px;
+      color: white;
+      line-height: 1;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .tab-add-circle:active { transform: scale(0.93); box-shadow: 0 2px 8px rgba(0,122,255,0.3); }
+    .tab-add .tab-label { color: var(--blue); font-size: 10px; font-weight: 500; margin-top: -2px; }
+
+    /* ── NAV HEADERS ── */
+    .nav-header {
+      padding: calc(var(--safe-top) + 8px) 20px 16px;
+      background: rgba(255,255,255,0.88);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 0.5px solid var(--separator);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .nav-title { font-size: 34px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.1; }
+    .nav-subtitle { font-size: 13px; color: var(--label2); margin-top: 2px; }
+
+    /* ── MAP VIEW ── */
+    #map-view { overflow: hidden; }
+    #map { position: absolute; inset: 0; }
+    #map-header {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      padding: calc(var(--safe-top) + 8px) 16px 12px;
+      z-index: 10;
+      pointer-events: none;
+    }
+    #map-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: all;
+    }
+    .map-title-text {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--label);
+      letter-spacing: -0.5px;
+      text-shadow: 0 1px 4px rgba(255,255,255,0.9);
+    }
+    .map-pill {
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 20px;
+      padding: 7px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--blue);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+      cursor: pointer;
+      border: none;
+    }
+    #map-legend {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 14px;
+      padding: 12px 14px;
+      z-index: 10;
+      box-shadow: 0 2px 14px rgba(0,0,0,0.1);
+    }
+    .legend-row { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 500; margin-bottom: 5px; }
+    .legend-row:last-child { margin-bottom: 0; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Leaflet popup */
+    .leaflet-popup-content-wrapper { border-radius: 16px !important; box-shadow: 0 4px 24px rgba(0,0,0,0.14) !important; padding: 0 !important; overflow: hidden; }
+    .leaflet-popup-content { margin: 0 !important; width: auto !important; }
+    .leaflet-popup-tip-container { display: none; }
+    .plant-popup { padding: 14px 16px; min-width: 200px; }
+    .plant-popup-name { font-size: 16px; font-weight: 700; margin-bottom: 3px; }
+    .plant-popup-meta { font-size: 13px; color: var(--label2); margin-bottom: 10px; line-height: 1.4; }
+    .popup-actions { display: flex; gap: 8px; }
+    .popup-btn { flex: 1; padding: 8px; border-radius: 10px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .popup-btn-primary { background: var(--blue); color: white; }
+    .popup-btn-water { background: var(--gray5); color: var(--label); }
+
+    /* ── FILTER PILLS ── */
+    .filter-row {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      flex-shrink: 0;
+    }
+    .filter-row::-webkit-scrollbar { display: none; }
+    .fpill {
+      white-space: nowrap;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      background: white;
+      color: var(--label2);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .fpill.active { background: var(--blue); color: white; box-shadow: 0 2px 8px rgba(0,122,255,0.3); }
+
+    /* ── PLANT CARDS ── */
+    .plant-card {
+      margin: 0 16px 10px;
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .plant-card-row {
+      display: flex;
+      align-items: center;
+      padding: 14px 16px;
+      gap: 12px;
+      cursor: pointer;
+    }
+    .plant-card-row:active { background: var(--gray6); }
+    .plant-icon {
+      width: 46px; height: 46px;
+      border-radius: 13px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+    .plant-card-info { flex: 1; min-width: 0; }
+    .plant-card-name { font-size: 16px; font-weight: 600; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .plant-card-meta { font-size: 13px; color: var(--label2); }
+    .plant-card-right { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex-shrink: 0; }
+
+    /* ── STATUS BADGES ── */
+    .badge {
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1px;
+    }
+    .badge-alive          { background: rgba(52,199,89,0.13);  color: #1B8E3A; }
+    .badge-died           { background: rgba(255,59,48,0.12);  color: #CC2E25; }
+    .badge-eaten          { background: rgba(255,149,0,0.13);  color: #B86500; }
+    .badge-never_sprouted { background: rgba(142,142,147,0.13);color: #636366; }
+    .badge-unknown        { background: rgba(142,142,147,0.13);color: #636366; }
+
+    .water-tag { font-size: 11px; color: var(--label3); }
+    .water-tag.overdue { color: var(--orange); font-weight: 600; }
+
+    /* ── STATS ── */
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px; }
+    .stat-card {
+      background: white;
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .stat-card.wide { grid-column: 1 / -1; }
+    .stat-label { font-size: 12px; font-weight: 600; color: var(--label2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .stat-num { font-size: 36px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
+    .stat-sub { font-size: 13px; color: var(--label2); margin-top: 4px; }
+    .prog-bar { height: 6px; background: var(--gray5); border-radius: 3px; margin-top: 10px; overflow: hidden; }
+    .prog-fill { height: 100%; border-radius: 3px; background: var(--green); }
+
+    .type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+    .type-stat { display: flex; align-items: center; gap: 8px; }
+    .type-stat-num { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+    .type-stat-label { font-size: 12px; color: var(--label2); }
+
+    .water-needed-card {
+      display: flex; align-items: center; justify-content: space-between;
+      background: white; border-radius: 14px; padding: 12px 14px; margin-bottom: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06); cursor: pointer;
+    }
+    .water-needed-card:active { opacity: 0.7; }
+    .wn-left { display: flex; align-items: center; gap: 10px; }
+    .wn-name { font-size: 15px; font-weight: 600; }
+    .wn-days { font-size: 13px; color: var(--orange); font-weight: 500; }
+    .wn-btn { padding: 7px 14px; border-radius: 20px; background: rgba(0,122,255,0.1); color: var(--blue); font-size: 13px; font-weight: 600; border: none; cursor: pointer; }
+
+    /* ── MODALS ── */
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 200;
+      display: flex; align-items: flex-end;
+      opacity: 0;
+      transition: opacity 0.28s;
+      pointer-events: none;
+    }
+    .overlay.open { opacity: 1; pointer-events: all; }
+    .sheet {
+      background: var(--bg);
+      border-radius: 22px 22px 0 0;
+      width: 100%;
+      max-height: 92dvh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      transform: translateY(100%);
+      transition: transform 0.34s cubic-bezier(0.32, 0.72, 0, 1);
+      padding-bottom: calc(var(--safe-bottom) + 24px);
+    }
+    .overlay.open .sheet { transform: translateY(0); }
+    .handle { width: 36px; height: 4px; background: var(--gray4); border-radius: 2px; margin: 10px auto 0; }
+    .sheet-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px 8px;
+    }
+    .sheet-title { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+    .hdr-btn {
+      padding: 7px 16px; border-radius: 20px; border: none;
+      font-size: 15px; font-weight: 600; cursor: pointer;
+    }
+    .hdr-cancel { background: var(--gray5); color: var(--label); }
+    .hdr-save { background: var(--blue); color: white; }
+    .hdr-done { background: var(--gray5); color: var(--label); }
+
+    /* ── FORM ── */
+    .form-block {
+      margin: 0 16px 14px;
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .form-row {
+      display: flex; align-items: center;
+      padding: 14px 16px;
+      border-bottom: 0.5px solid var(--separator);
+      gap: 12px;
+    }
+    .form-row:last-child { border-bottom: none; }
+    .form-lbl { font-size: 15px; font-weight: 500; min-width: 78px; flex-shrink: 0; }
+    .form-inp {
+      flex: 1; border: none; outline: none;
+      font-size: 15px; font-family: inherit;
+      color: var(--label); background: transparent; text-align: right;
+    }
+    .form-inp::placeholder { color: var(--label3); }
+    select.form-inp { -webkit-appearance: none; cursor: pointer; }
+    textarea.form-inp { resize: none; min-height: 54px; text-align: left; padding-top: 2px; }
+
+    /* ── TYPE SELECTOR ── */
+    .type-row { display: flex; gap: 8px; padding: 4px 16px 14px; }
+    .type-opt {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;
+      padding: 12px 4px; border-radius: 14px; border: 2px solid transparent;
+      background: white; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .type-opt.sel { border-color: var(--blue); background: rgba(0,122,255,0.05); }
+    .type-opt-icon { font-size: 26px; }
+    .type-opt-lbl { font-size: 11px; font-weight: 600; color: var(--label2); }
+    .type-opt.sel .type-opt-lbl { color: var(--blue); }
+
+    /* ── VOICE ── */
+    .voice-area { display: flex; flex-direction: column; align-items: center; padding: 20px 20px 8px; gap: 12px; }
+    .voice-btn {
+      width: 80px; height: 80px; border-radius: 50%; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; font-size: 32px;
+      background: var(--blue); color: white;
+      box-shadow: 0 4px 20px rgba(0,122,255,0.4);
+      transition: transform 0.15s;
+      position: relative;
+    }
+    .voice-btn.on { background: var(--red); box-shadow: 0 4px 20px rgba(255,59,48,0.4); animation: vpulse 1.4s infinite; }
+    .voice-btn:active { transform: scale(0.93); }
+    @keyframes vpulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(255,59,48,0.3), 0 4px 20px rgba(255,59,48,0.4); }
+      50% { box-shadow: 0 0 0 18px rgba(255,59,48,0), 0 4px 20px rgba(255,59,48,0.4); }
+    }
+    .voice-hint { font-size: 14px; color: var(--label2); text-align: center; max-width: 240px; line-height: 1.4; }
+    .voice-result {
+      font-size: 16px; font-weight: 500; text-align: center;
+      padding: 10px 20px; background: var(--gray6);
+      border-radius: 12px; min-height: 44px;
+      display: none; align-items: center; justify-content: center;
+      width: 100%; max-width: 300px;
+    }
+    .voice-result.show { display: flex; }
+
+    /* ── GPS PILL ── */
+    .gps-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 14px; margin: 0 16px 10px;
+      background: rgba(52,199,89,0.1); border-radius: 12px;
+    }
+    .gps-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: gblink 1.4s infinite; }
+    @keyframes gblink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .gps-txt { font-size: 13px; color: #1B8E3A; font-weight: 500; }
+
+    /* ── PHOTO ── */
+    .photo-area { padding: 0 16px 12px; }
+    .photo-preview { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 14px; display: none; margin-bottom: 8px; }
+    .photo-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 14px;
+      border: 2px dashed var(--gray3); border-radius: 14px;
+      background: transparent; font-size: 15px; font-weight: 600;
+      color: var(--blue); cursor: pointer;
+    }
+    #photo-file { display: none; }
+
+    /* ── DETAIL ── */
+    .detail-hero {
+      width: 100%; aspect-ratio: 4/3; object-fit: cover;
+      background: linear-gradient(135deg, #e8f5e9, #f1f8e9);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-size: 56px;
+    }
+    .detail-hero img { width: 100%; aspect-ratio: 4/3; object-fit: cover; }
+    .detail-body { padding: 20px; }
+    .detail-name { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 4px; }
+    .detail-meta { font-size: 15px; color: var(--label2); margin-bottom: 18px; line-height: 1.5; }
+    .action-row { display: flex; gap: 10px; margin-bottom: 20px; }
+    .act-btn {
+      flex: 1; padding: 13px; border-radius: 14px; border: none;
+      font-size: 15px; font-weight: 600; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .act-btn:active { opacity: 0.7; }
+    .act-water { background: rgba(0,122,255,0.1); color: var(--blue); }
+    .act-water.done { background: rgba(52,199,89,0.1); color: var(--green); }
+    .act-status { background: var(--gray5); color: var(--label); }
+    .wh-title { font-size: 13px; font-weight: 600; color: var(--label2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+    .wh-dots { display: flex; gap: 5px; flex-wrap: wrap; }
+    .wh-dot {
+      width: 36px; height: 36px; border-radius: 9px;
+      background: rgba(0,122,255,0.1); display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 600; color: var(--blue); line-height: 1.2; text-align: center;
+    }
+
+    /* ── STATUS SHEET ── */
+    .status-opt {
+      display: flex; align-items: center; gap: 14px;
+      padding: 16px 18px; border-bottom: 0.5px solid var(--separator);
+      cursor: pointer; font-size: 16px; font-weight: 500;
+    }
+    .status-opt:last-child { border-bottom: none; }
+    .status-opt:active { background: var(--gray5); }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed;
+      bottom: calc(var(--tab-height) + 14px);
+      left: 50%;
+      transform: translateX(-50%) translateY(16px);
+      background: rgba(28,28,30,0.88);
+      backdrop-filter: blur(20px);
+      color: white; padding: 10px 20px; border-radius: 22px;
+      font-size: 14px; font-weight: 500;
+      z-index: 500; opacity: 0;
+      transition: all 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+      white-space: nowrap; pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── EMPTY STATE ── */
+    .empty {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 70px 30px; gap: 12px; text-align: center;
+    }
+    .empty-icon { font-size: 56px; opacity: 0.35; }
+    .empty-title { font-size: 20px; font-weight: 600; }
+    .empty-sub { font-size: 15px; color: var(--label2); line-height: 1.45; max-width: 240px; }
+
+    /* ── UTILITY ── */
+    .wide-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 14px; border-radius: 14px;
+      background: white; border: none;
+      font-size: 15px; font-weight: 600; color: var(--blue);
+      cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .wide-btn.red { color: var(--red); }
+    .wide-btn:active { opacity: 0.7; }
+    .section-lbl { padding: 18px 20px 8px; font-size: 13px; font-weight: 600; color: var(--label2); text-transform: uppercase; letter-spacing: 0.5px; }
+    .leaflet-container { background: #ddd; }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <div id="view-container">
+
+    <!-- ───── MAP ───── -->
+    <div class="view" id="v-map">
+      <div id="map"></div>
+      <div id="map-header">
+        <div id="map-title-row">
+          <span class="map-title-text">🌿 Grove</span>
+          <button class="map-pill" id="layer-btn" onclick="toggleLayer()">Satellite</button>
+        </div>
+      </div>
+      <div id="map-legend">
+        <div class="legend-row"><div class="legend-dot" style="background:#1E7A3A"></div>Trees</div>
+        <div class="legend-row"><div class="legend-dot" style="background:#8BC34A"></div>Bare Root</div>
+        <div class="legend-row"><div class="legend-dot" style="background:#E91E8C"></div>Flowers</div>
+        <div class="legend-row"><div class="legend-dot" style="background:#FF9800"></div>Seeds</div>
+      </div>
+    </div>
+
+    <!-- ───── PLANT LIST ───── -->
+    <div class="view hidden" id="v-list">
+      <div class="nav-header">
+        <div class="nav-title">My Plantings</div>
+        <div class="nav-subtitle" id="list-sub">–</div>
+      </div>
+      <div class="filter-row" id="filter-row">
+        <button class="fpill active" data-f="all"       onclick="setFilter('all')">All</button>
+        <button class="fpill"        data-f="tree"      onclick="setFilter('tree')">🌳 Trees</button>
+        <button class="fpill"        data-f="bareroot"  onclick="setFilter('bareroot')">🌱 Bare Root</button>
+        <button class="fpill"        data-f="flower"    onclick="setFilter('flower')">🌸 Flowers</button>
+        <button class="fpill"        data-f="seed"      onclick="setFilter('seed')">🌰 Seeds</button>
+        <button class="fpill"        data-f="alive"     onclick="setFilter('alive')">✅ Alive</button>
+        <button class="fpill"        data-f="lost"      onclick="setFilter('lost')">❌ Lost</button>
+      </div>
+      <div id="plant-list" style="padding-bottom:16px"></div>
+    </div>
+
+    <!-- ───── STATS ───── -->
+    <div class="view hidden" id="v-stats">
+      <div class="nav-header">
+        <div class="nav-title">Grove Stats</div>
+        <div class="nav-subtitle" id="stats-sub">–</div>
+      </div>
+      <div id="stats-body"></div>
+    </div>
+
+  </div>
+
+  <!-- ───── TAB BAR ───── -->
+  <div id="tab-bar">
+    <div class="tab-item active" id="tb-map" onclick="nav('map')">
+      <div class="tab-icon">🗺️</div>
+      <div class="tab-label">Map</div>
+    </div>
+    <div class="tab-item" id="tb-list" onclick="nav('list')">
+      <div class="tab-icon">🌿</div>
+      <div class="tab-label">Plants</div>
+    </div>
+    <div class="tab-add" onclick="openAdd()">
+      <div class="tab-add-circle">+</div>
+      <div class="tab-label">Add</div>
+    </div>
+    <div class="tab-item" id="tb-stats" onclick="nav('stats')">
+      <div class="tab-icon">📊</div>
+      <div class="tab-label">Stats</div>
+    </div>
+  </div>
+</div>
+
+<!-- ───── ADD MODAL ───── -->
+<div class="overlay" id="add-overlay" onclick="overlayTap(event,'add-overlay',closeAdd)">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">Log Planting</div>
+      <div style="display:flex;gap:8px">
+        <button class="hdr-btn hdr-cancel" onclick="closeAdd()">Cancel</button>
+        <button class="hdr-btn hdr-save"   onclick="savePlant()">Save</button>
+      </div>
+    </div>
+
+    <!-- Voice -->
+    <div class="voice-area">
+      <button class="voice-btn" id="voice-btn" onclick="toggleVoice()">🎤</button>
+      <div class="voice-hint">Tap to speak — say "3 apple trees" or "5 bleeding heart seeds"</div>
+      <div class="voice-result" id="voice-result"></div>
+    </div>
+
+    <!-- GPS -->
+    <div class="gps-row">
+      <div class="gps-dot"></div>
+      <div class="gps-txt" id="gps-txt">Acquiring GPS…</div>
+    </div>
+
+    <!-- Type -->
+    <div class="type-row">
+      <div class="type-opt sel" data-t="tree"     onclick="pickType('tree')"><div class="type-opt-icon">🌳</div><div class="type-opt-lbl">Tree</div></div>
+      <div class="type-opt"     data-t="bareroot" onclick="pickType('bareroot')"><div class="type-opt-icon">🌱</div><div class="type-opt-lbl">Bare Root</div></div>
+      <div class="type-opt"     data-t="flower"   onclick="pickType('flower')"><div class="type-opt-icon">🌸</div><div class="type-opt-lbl">Flower</div></div>
+      <div class="type-opt"     data-t="seed"     onclick="pickType('seed')"><div class="type-opt-icon">🌰</div><div class="type-opt-lbl">Seed</div></div>
+    </div>
+
+    <!-- Form -->
+    <div class="form-block">
+      <div class="form-row">
+        <div class="form-lbl">Name</div>
+        <input  class="form-inp" id="f-name"  placeholder="e.g. Sugar Maple" type="text" autocomplete="off">
+      </div>
+      <div class="form-row">
+        <div class="form-lbl">Quantity</div>
+        <input  class="form-inp" id="f-qty"   placeholder="1" type="number" min="1" inputmode="numeric">
+      </div>
+      <div class="form-row">
+        <div class="form-lbl">Date</div>
+        <input  class="form-inp" id="f-date"  type="date">
+      </div>
+    </div>
+
+    <!-- Photo -->
+    <div class="photo-area">
+      <input type="file" id="photo-file" accept="image/*" capture="environment" onchange="loadPhoto(this)">
+      <img id="photo-prev" class="photo-preview">
+      <button class="photo-btn" onclick="document.getElementById('photo-file').click()">📷 Add Photo</button>
+    </div>
+
+    <!-- Notes -->
+    <div class="form-block">
+      <div class="form-row" style="align-items:flex-start">
+        <div class="form-lbl" style="padding-top:2px">Notes</div>
+        <textarea class="form-inp" id="f-notes" placeholder="Soil, location details, etc." rows="2"></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ───── DETAIL MODAL ───── -->
+<div class="overlay" id="detail-overlay" onclick="overlayTap(event,'detail-overlay',closeDetail)">
+  <div class="sheet" id="detail-sheet"></div>
+</div>
+
+<!-- ───── STATUS SHEET ───── -->
+<div class="overlay" id="status-overlay" onclick="overlayTap(event,'status-overlay',closeStatus)">
+  <div class="sheet" style="padding-bottom:calc(var(--safe-bottom)+16px)">
+    <div class="handle"></div>
+    <div style="text-align:center;padding:12px 0 10px;font-size:13px;font-weight:600;color:var(--label2);text-transform:uppercase;letter-spacing:.5px">Update Status</div>
+    <div class="form-block" style="margin-bottom:0">
+      <div class="status-opt" onclick="applyStatus('alive')">          <span>🟢</span> Alive &amp; Growing</div>
+      <div class="status-opt" onclick="applyStatus('died')">           <span>🔴</span> Didn't Make It</div>
+      <div class="status-opt" onclick="applyStatus('eaten')">          <span>🟠</span> Eaten by Animal</div>
+      <div class="status-opt" onclick="applyStatus('never_sprouted')"> <span>⚫️</span> Never Sprouted</div>
+    </div>
+  </div>
+</div>
+
+<!-- ───── TOAST ───── -->
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+// ═══════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════
+const DB = {
+  all()         { return JSON.parse(localStorage.getItem('grove_v1') || '[]'); },
+  save(arr)     { localStorage.setItem('grove_v1', JSON.stringify(arr)); },
+  add(p)        { const a = this.all(); a.push(p); this.save(a); },
+  update(id, u) { const a = this.all(), i = a.findIndex(x=>x.id===id); if(i>=0){a[i]={...a[i],...u};this.save(a);} },
+  del(id)       { this.save(this.all().filter(x=>x.id!==id)); },
+  get(id)       { return this.all().find(x=>x.id===id); }
+};
+
+// ═══════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════
+const TYPES = {
+  tree:     { icon:'🌳', color:'#1E7A3A', label:'Tree' },
+  bareroot: { icon:'🌱', color:'#8BC34A', label:'Bare Root' },
+  flower:   { icon:'🌸', color:'#E91E8C', label:'Flower' },
+  seed:     { icon:'🌰', color:'#FF9800', label:'Seed' }
+};
+const STATUS = {
+  alive:          { label:'Alive',          cls:'badge-alive' },
+  died:           { label:'Didn\'t Make It', cls:'badge-died' },
+  eaten:          { label:'Eaten by Animal', cls:'badge-eaten' },
+  never_sprouted: { label:'Never Sprouted',  cls:'badge-never_sprouted' },
+  unknown:        { label:'Unknown',         cls:'badge-unknown' }
+};
+
+// ═══════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════
+let view        = 'map';
+let filter      = 'all';
+let mapObj      = null;
+let markers     = {};
+let layerMode   = 'street';
+let streetTiles, satTiles;
+let gpsLoc      = null;
+let selType     = 'tree';
+let photoData   = null;
+let recog       = null;
+let listening   = false;
+let detailId    = null;
+let statusId    = null;
+
+// ═══════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════
+function nav(v) {
+  view = v;
+  ['map','list','stats'].forEach(k => {
+    document.getElementById('v-'+k).classList.toggle('hidden', k !== v);
+    const tb = document.getElementById('tb-'+k);
+    if (tb) tb.classList.toggle('active', k === v);
+  });
+  if (v === 'map')   { if (mapObj) setTimeout(() => mapObj.invalidateSize(), 50); }
+  if (v === 'list')  renderList();
+  if (v === 'stats') renderStats();
+}
+
+// ═══════════════════════════════════════════
+//  MAP
+// ═══════════════════════════════════════════
+function initMap() {
+  mapObj = L.map('map', {
+    center: [42.0, -74.5],
+    zoom: 15,
+    zoomControl: false,
+    attributionControl: false
+  });
+
+  streetTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
+  satTiles    = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
+  streetTiles.addTo(mapObj);
+
+  navigator.geolocation?.getCurrentPosition(p => {
+    gpsLoc = { lat: p.coords.latitude, lng: p.coords.longitude };
+    mapObj.setView([gpsLoc.lat, gpsLoc.lng], 17);
+  });
+
+  refreshMarkers();
+}
+
+function toggleLayer() {
+  if (layerMode === 'street') {
+    mapObj.removeLayer(streetTiles);
+    satTiles.addTo(mapObj);
+    layerMode = 'satellite';
+    document.getElementById('layer-btn').textContent = 'Map';
+  } else {
+    mapObj.removeLayer(satTiles);
+    streetTiles.addTo(mapObj);
+    layerMode = 'street';
+    document.getElementById('layer-btn').textContent = 'Satellite';
+  }
+}
+
+function refreshMarkers() {
+  Object.values(markers).forEach(m => mapObj.removeLayer(m));
+  markers = {};
+  DB.all().forEach(p => {
+    if (!p.location) return;
+    const cfg = TYPES[p.type] || TYPES.tree;
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:36px;height:36px;border-radius:50%;background:${cfg.color};display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,.3);border:2.5px solid white">${cfg.icon}</div>`,
+      iconSize: [36,36], iconAnchor: [18,18]
+    });
+    const dw = daysSince(p);
+    const wt = dw === null ? 'Not yet watered' : dw === 0 ? '💧 Watered today' : `💧 ${dw}d ago`;
+    const marker = L.marker([p.location.lat, p.location.lng], { icon });
+    marker.bindPopup(`
+      <div class="plant-popup">
+        <div class="plant-popup-name">${p.name}</div>
+        <div class="plant-popup-meta">${p.quantity} ${cfg.label}${p.quantity>1?'s':''} · ${fmtDate(p.datePlanted)}<br>${wt}</div>
+        <div class="popup-actions">
+          <button class="popup-btn popup-btn-primary" onclick="popDetail('${p.id}')">Details</button>
+          <button class="popup-btn popup-btn-water"   onclick="popWater('${p.id}')">💧 Water</button>
+        </div>
+      </div>`, { maxWidth: 240 });
+    marker.addTo(mapObj);
+    markers[p.id] = marker;
+  });
+}
+
+function popDetail(id) { mapObj.closePopup(); openDetail(id); }
+function popWater(id)  { mapObj.closePopup(); water(id); }
+
+// ═══════════════════════════════════════════
+//  ADD PLANT
+// ═══════════════════════════════════════════
+function openAdd() {
+  document.getElementById('f-name').value  = '';
+  document.getElementById('f-qty').value   = '1';
+  document.getElementById('f-date').value  = today();
+  document.getElementById('f-notes').value = '';
+  document.getElementById('photo-prev').style.display = 'none';
+  document.getElementById('photo-file').value = '';
+  document.getElementById('voice-result').classList.remove('show');
+  photoData = null;
+  pickType('tree');
+  document.getElementById('add-overlay').classList.add('open');
+
+  gpsLoc = null;
+  document.getElementById('gps-txt').textContent = 'Acquiring GPS…';
+  navigator.geolocation?.getCurrentPosition(p => {
+    gpsLoc = { lat: p.coords.latitude, lng: p.coords.longitude };
+    const la = p.coords.latitude.toFixed(5), lo = p.coords.longitude.toFixed(5);
+    document.getElementById('gps-txt').textContent = `📍 ${la}, ${lo}`;
+  }, () => {
+    document.getElementById('gps-txt').textContent = 'Location unavailable';
+  }, { enableHighAccuracy: true, timeout: 12000 });
+}
+
+function closeAdd() {
+  document.getElementById('add-overlay').classList.remove('open');
+  stopListen();
+}
+
+function pickType(t) {
+  selType = t;
+  document.querySelectorAll('.type-opt').forEach(el => el.classList.toggle('sel', el.dataset.t === t));
+}
+
+function loadPhoto(inp) {
+  const f = inp.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    photoData = e.target.result;
+    const prev = document.getElementById('photo-prev');
+    prev.src = photoData; prev.style.display = 'block';
+  };
+  r.readAsDataURL(f);
+}
+
+function savePlant() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { toast('Enter a plant name'); return; }
+  const qty  = parseInt(document.getElementById('f-qty').value)  || 1;
+  const date = document.getElementById('f-date').value           || today();
+  const notes= document.getElementById('f-notes').value.trim();
+  DB.add({ id: uid(), name, type: selType, quantity: qty, datePlanted: date,
+    location: gpsLoc, status: 'alive', notes, photo: photoData, waterings: [], createdAt: new Date().toISOString() });
+  closeAdd();
+  refreshMarkers();
+  toast(`✅ ${name} logged!`);
+  if (gpsLoc && view === 'map') mapObj.flyTo([gpsLoc.lat, gpsLoc.lng], 18, { duration: 1.5 });
+}
+
+// ═══════════════════════════════════════════
+//  PLANT LIST
+// ═══════════════════════════════════════════
+function setFilter(f) {
+  filter = f;
+  document.querySelectorAll('.fpill').forEach(p => p.classList.toggle('active', p.dataset.f === f));
+  renderList();
+}
+
+function renderList() {
+  const plants = DB.all();
+  const total  = plants.reduce((s,p) => s + p.quantity, 0);
+  document.getElementById('list-sub').textContent = `${plants.length} plantings · ${total} plants total`;
+
+  let list = plants;
+  if (filter === 'tree' || filter === 'bareroot' || filter === 'flower' || filter === 'seed')
+    list = plants.filter(p => p.type === filter);
+  else if (filter === 'alive')
+    list = plants.filter(p => p.status === 'alive');
+  else if (filter === 'lost')
+    list = plants.filter(p => ['died','eaten','never_sprouted'].includes(p.status));
+
+  list = list.slice().sort((a,b) => b.datePlanted.localeCompare(a.datePlanted));
+
+  const el = document.getElementById('plant-list');
+  if (!list.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">🌱</div><div class="empty-title">No plantings yet</div><div class="empty-sub">Tap + to log your first planting.</div></div>`;
+    return;
+  }
+  el.innerHTML = list.map(p => {
+    const cfg = TYPES[p.type]   || TYPES.tree;
+    const st  = STATUS[p.status]|| STATUS.unknown;
+    const dw  = daysSince(p);
+    const od  = dw !== null && dw > 7;
+    const wlbl= dw === null ? 'Never watered' : dw === 0 ? 'Watered today' : `${dw}d since water`;
+    return `
+    <div class="plant-card">
+      <div class="plant-card-row" onclick="openDetail('${p.id}')">
+        <div class="plant-icon" style="background:${cfg.color}1A">${cfg.icon}</div>
+        <div class="plant-card-info">
+          <div class="plant-card-name">${p.name}</div>
+          <div class="plant-card-meta">${p.quantity} ${cfg.label}${p.quantity>1?'s':''} · ${fmtDate(p.datePlanted)}</div>
+        </div>
+        <div class="plant-card-right">
+          <span class="badge ${st.cls}">${st.label}</span>
+          <span class="water-tag ${od?'overdue':''}">💧 ${wlbl}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════
+//  PLANT DETAIL
+// ═══════════════════════════════════════════
+function openDetail(id) {
+  detailId = id;
+  const p   = DB.get(id); if (!p) return;
+  const cfg = TYPES[p.type] || TYPES.tree;
+  const st  = STATUS[p.status] || STATUS.unknown;
+  const dw  = daysSince(p);
+  const wdone = dw === 0;
+  const recent = (p.waterings||[]).slice(-10).reverse();
+
+  document.getElementById('detail-sheet').innerHTML = `
+    <div class="handle"></div>
+    <div class="sheet-header">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:24px">${cfg.icon}</span>
+        <div class="sheet-title">${p.name}</div>
+      </div>
+      <button class="hdr-btn hdr-done" onclick="closeDetail()">Done</button>
+    </div>
+    ${p.photo
+      ? `<img src="${p.photo}" style="width:100%;aspect-ratio:4/3;object-fit:cover;display:block">`
+      : `<div class="detail-hero"><div>${cfg.icon}</div></div>`}
+    <div class="detail-body">
+      <div class="detail-name">${p.name}</div>
+      <div class="detail-meta">
+        ${p.quantity} ${cfg.label}${p.quantity>1?'s':''} · Planted ${fmtDate(p.datePlanted)}
+        ${p.location ? `<br>📍 ${p.location.lat.toFixed(4)}, ${p.location.lng.toFixed(4)}` : ''}
+        ${dw !== null ? `<br>💧 Last watered ${dw===0?'today':`${dw} days ago`}` : '<br>💧 Never watered'}
+      </div>
+      <div class="action-row">
+        <button class="act-btn act-water ${wdone?'done':''}" onclick="water('${p.id}')">
+          💧 ${wdone ? 'Watered Today' : 'Log Watering'}
+        </button>
+        <button class="act-btn act-status" onclick="openStatus('${p.id}')">
+          <span class="badge ${st.cls}">${st.label}</span>
+        </button>
+      </div>
+      ${p.notes ? `
+        <div class="form-block" style="margin-bottom:16px">
+          <div class="form-row"><div style="font-size:15px;color:var(--label2)">📝 ${p.notes}</div></div>
+        </div>` : ''}
+      <div style="margin-bottom:20px">
+        <div class="wh-title">Watering History</div>
+        ${recent.length
+          ? `<div class="wh-dots">${recent.map(d => {
+              const dt = new Date(d+'T00:00:00');
+              return `<div class="wh-dot">${dt.toLocaleDateString('en-US',{month:'numeric',day:'numeric'})}</div>`;
+            }).join('')}</div>`
+          : `<div style="font-size:14px;color:var(--label3)">No watering logged yet</div>`}
+      </div>
+      ${p.location ? `<button class="wide-btn" style="margin-bottom:10px" onclick="flyTo('${p.id}')">🗺️ Show on Map</button>` : ''}
+      <button class="wide-btn red" onclick="delPlant('${p.id}')">Delete Planting</button>
+    </div>
+  `;
+  document.getElementById('detail-overlay').classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detail-overlay').classList.remove('open');
+  if (view === 'list')  renderList();
+  if (view === 'stats') renderStats();
+}
+
+function flyTo(id) {
+  const p = DB.get(id); if (!p?.location) return;
+  closeDetail();
+  nav('map');
+  mapObj.flyTo([p.location.lat, p.location.lng], 18, { duration: 1.5 });
+  setTimeout(() => markers[id]?.openPopup(), 1650);
+}
+
+function delPlant(id) {
+  if (!confirm('Delete this planting?')) return;
+  DB.del(id);
+  closeDetail();
+  refreshMarkers();
+  toast('Deleted');
+}
+
+// ═══════════════════════════════════════════
+//  WATERING
+// ═══════════════════════════════════════════
+function water(id) {
+  const p = DB.get(id); if (!p) return;
+  const td = today();
+  const ws = p.waterings || [];
+  if (ws.includes(td)) { toast('Already watered today!'); return; }
+  ws.push(td);
+  DB.update(id, { waterings: ws });
+  toast(`💧 ${p.name} watered!`);
+  refreshMarkers();
+  if (document.getElementById('detail-overlay').classList.contains('open') && detailId === id) openDetail(id);
+  if (view === 'stats') renderStats();
+}
+
+function daysSince(p) {
+  if (!p.waterings?.length) return null;
+  const last = new Date(p.waterings[p.waterings.length-1]+'T00:00:00');
+  const now  = new Date(); now.setHours(0,0,0,0);
+  return Math.round((now - last) / 86400000);
+}
+
+// ═══════════════════════════════════════════
+//  STATUS
+// ═══════════════════════════════════════════
+function openStatus(id) {
+  statusId = id;
+  document.getElementById('status-overlay').classList.add('open');
+}
+function closeStatus() {
+  document.getElementById('status-overlay').classList.remove('open');
+}
+function applyStatus(s) {
+  if (!statusId) return;
+  DB.update(statusId, { status: s });
+  toast(`Status: ${STATUS[s]?.label}`);
+  closeStatus();
+  if (document.getElementById('detail-overlay').classList.contains('open') && detailId === statusId) openDetail(statusId);
+  refreshMarkers();
+  statusId = null;
+}
+
+// ═══════════════════════════════════════════
+//  STATS
+// ═══════════════════════════════════════════
+function renderStats() {
+  const plants = DB.all();
+  const total  = plants.reduce((s,p) => s+p.quantity, 0);
+  const alive  = plants.filter(p => p.status==='alive');
+  const aQty   = alive.reduce((s,p) => s+p.quantity, 0);
+  const surv   = total ? Math.round(aQty/total*100) : 0;
+  const td     = today();
+  const needW  = plants.filter(p => p.status==='alive' && (() => { const d = daysSince(p); return d===null||d>7; })());
+  const watTd  = plants.filter(p => daysSince(p)===0).length;
+
+  document.getElementById('stats-sub').textContent = `${plants.length} plantings · ${total} plants total`;
+
+  const byType = {};
+  Object.keys(TYPES).forEach(t => {
+    const ps = plants.filter(p=>p.type===t);
+    byType[t] = { n: ps.length, q: ps.reduce((s,p)=>s+p.quantity,0) };
+  });
+
+  document.getElementById('stats-body').innerHTML = `
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Planted</div>
+        <div class="stat-num" style="color:var(--blue)">${total}</div>
+        <div class="stat-sub">${plants.length} planting${plants.length!==1?'s':''}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Survival Rate</div>
+        <div class="stat-num" style="color:var(--green)">${surv}%</div>
+        <div class="stat-sub">${aQty} of ${total} alive</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:${surv}%"></div></div>
+      </div>
+      <div class="stat-card wide">
+        <div class="stat-label">By Type</div>
+        <div class="type-grid">
+          ${Object.entries(TYPES).map(([t,c]) => `
+            <div class="type-stat">
+              <span style="font-size:22px">${c.icon}</span>
+              <div><div class="type-stat-num">${byType[t]?.q||0}</div><div class="type-stat-label">${c.label}s</div></div>
+            </div>`).join('')}
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Need Water</div>
+        <div class="stat-num" style="color:${needW.length?'var(--orange)':'var(--green)'}">${needW.length}</div>
+        <div class="stat-sub">plants overdue (7d+)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Watered Today</div>
+        <div class="stat-num" style="color:var(--blue)">${watTd}</div>
+        <div class="stat-sub">of ${alive.length} alive</div>
+      </div>
+    </div>
+
+    ${needW.length ? `
+      <div class="section-lbl">💧 Needs Watering</div>
+      <div style="padding:0 16px">
+        ${needW.slice(0,10).map(p => {
+          const dw = daysSince(p);
+          const cfg = TYPES[p.type]||TYPES.tree;
+          return `
+          <div class="water-needed-card" onclick="water('${p.id}')">
+            <div class="wn-left">
+              <span style="font-size:22px">${cfg.icon}</span>
+              <div>
+                <div class="wn-name">${p.name}</div>
+                <div class="wn-days">${dw===null?'Never watered':`${dw} days ago`}</div>
+              </div>
+            </div>
+            <button class="wn-btn">💧 Water</button>
+          </div>`;
+        }).join('')}
+      </div>
+    ` : `
+      <div class="empty" style="padding:30px">
+        <div class="empty-icon">💧</div>
+        <div class="empty-title">All watered!</div>
+        <div class="empty-sub">Every plant is up to date.</div>
+      </div>`}
+
+    <div style="padding:8px 16px 8px">
+      <button class="wide-btn" onclick="exportCSV()">📤 Export to CSV</button>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════
+//  CSV EXPORT
+// ═══════════════════════════════════════════
+function exportCSV() {
+  const plants = DB.all();
+  if (!plants.length) { toast('No plantings to export'); return; }
+  const hdr = ['Name','Type','Quantity','Date Planted','Status','Latitude','Longitude','Times Watered','Last Watered','Notes'];
+  const rows = plants.map(p => [
+    `"${p.name}"`, TYPES[p.type]?.label||p.type, p.quantity, p.datePlanted,
+    STATUS[p.status]?.label||p.status,
+    p.location?.lat||'', p.location?.lng||'',
+    (p.waterings||[]).length,
+    p.waterings?.length ? p.waterings[p.waterings.length-1] : '',
+    `"${(p.notes||'').replace(/"/g,"''")}"`
+  ]);
+  const csv  = [hdr,...rows].map(r=>r.join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv'});
+  const a    = Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:`grove-${today()}.csv`});
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('📤 Exported!');
+}
+
+// ═══════════════════════════════════════════
+//  VOICE
+// ═══════════════════════════════════════════
+function toggleVoice() { listening ? stopListen() : startListen(); }
+
+function startListen() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { toast('Voice not available on this browser'); return; }
+  recog = new SR();
+  recog.continuous = false; recog.interimResults = true; recog.lang = 'en-US';
+  recog.onstart = () => {
+    listening = true;
+    const b = document.getElementById('voice-btn');
+    b.classList.add('on'); b.textContent = '⏹️';
+    const r = document.getElementById('voice-result');
+    r.textContent = 'Listening…'; r.classList.add('show');
+  };
+  recog.onresult = e => {
+    const txt = Array.from(e.results).map(r=>r[0].transcript).join('');
+    document.getElementById('voice-result').textContent = txt;
+    if (e.results[0].isFinal) parseVoice(txt);
+  };
+  recog.onerror = recog.onend = stopListen;
+  recog.start();
+}
+
+function stopListen() {
+  listening = false;
+  try { recog?.stop(); } catch(e){}
+  recog = null;
+  const b = document.getElementById('voice-btn');
+  if (b) { b.classList.remove('on'); b.textContent = '🎤'; }
+}
+
+function parseVoice(txt) {
+  const NUMS = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,
+    eleven:11,twelve:12,fifteen:15,twenty:20,thirty:30,forty:40,fifty:50};
+  let qty=1, name=txt.trim();
+  const nm = txt.match(/^(\d+)\s+(.+)$/i);
+  if (nm) { qty=parseInt(nm[1]); name=nm[2]; }
+  else {
+    for (const [w,n] of Object.entries(NUMS)) {
+      const m = txt.match(new RegExp(`^${w}\\s+(.+)$`,'i'));
+      if (m) { qty=n; name=m[1]; break; }
+    }
+  }
+  name = name.trim().replace(/^\w/, c=>c.toUpperCase());
+  const lc = name.toLowerCase();
+  if (/tree|oak|maple|apple|pine|birch|cherry|walnut|ash|hemlock|spruce|fir|beech/.test(lc)) pickType('tree');
+  else if (/seed|wildflower/.test(lc)) pickType('seed');
+  else if (/flower|heart|lily|rose|tulip|daisy|lavender|echinacea|peony|iris|aster|fern/.test(lc)) pickType('flower');
+  else if (/root|shrub|bush|berry|bramble|currant|blueberry|raspberry|elderberry/.test(lc)) pickType('bareroot');
+  document.getElementById('f-name').value = name;
+  document.getElementById('f-qty').value  = qty;
+  toast(`Got it: ${qty} × ${name}`);
+}
+
+// ═══════════════════════════════════════════
+//  UTILITIES
+// ═══════════════════════════════════════════
+function today() { return new Date().toISOString().split('T')[0]; }
+function uid()   { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function fmtDate(s) {
+  if (!s) return '';
+  const d = new Date(s+'T00:00:00');
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 2600);
+}
+function overlayTap(e, id, fn) { if (e.target === document.getElementById(id)) fn(); }
+
+// ═══════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', initMap);
+</script>
+</body>
+</html>
