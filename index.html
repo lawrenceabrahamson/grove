@@ -500,7 +500,6 @@
       <div id="map-legend">
         <div class="legend-row"><div class="legend-dot" style="background:#1E7A3A"></div>Trees</div>
         <div class="legend-row"><div class="legend-dot" style="background:#8BC34A"></div>Bare Root</div>
-        <div class="legend-row"><div class="legend-dot" style="background:#E91E8C"></div>Flowers</div>
         <div class="legend-row"><div class="legend-dot" style="background:#FF9800"></div>Seeds</div>
       </div>
     </div>
@@ -515,7 +514,6 @@
         <button class="fpill active" data-f="all"       onclick="setFilter('all')">All</button>
         <button class="fpill"        data-f="tree"      onclick="setFilter('tree')">🌳 Trees</button>
         <button class="fpill"        data-f="bareroot"  onclick="setFilter('bareroot')">🌱 Bare Root</button>
-        <button class="fpill"        data-f="flower"    onclick="setFilter('flower')">🌸 Flowers</button>
         <button class="fpill"        data-f="seed"      onclick="setFilter('seed')">🌰 Seeds</button>
         <button class="fpill"        data-f="alive"     onclick="setFilter('alive')">✅ Alive</button>
         <button class="fpill"        data-f="lost"      onclick="setFilter('lost')">❌ Lost</button>
@@ -584,7 +582,6 @@
     <div class="type-row">
       <div class="type-opt sel" data-t="tree"     onclick="pickType('tree')"><div class="type-opt-icon">🌳</div><div class="type-opt-lbl">Tree</div></div>
       <div class="type-opt"     data-t="bareroot" onclick="pickType('bareroot')"><div class="type-opt-icon">🌱</div><div class="type-opt-lbl">Bare Root</div></div>
-      <div class="type-opt"     data-t="flower"   onclick="pickType('flower')"><div class="type-opt-icon">🌸</div><div class="type-opt-lbl">Flower</div></div>
       <div class="type-opt"     data-t="seed"     onclick="pickType('seed')"><div class="type-opt-icon">🌰</div><div class="type-opt-lbl">Seed</div></div>
     </div>
 
@@ -663,7 +660,6 @@ const DB = {
 const TYPES = {
   tree:     { icon:'🌳', color:'#1E7A3A', label:'Tree' },
   bareroot: { icon:'🌱', color:'#8BC34A', label:'Bare Root' },
-  flower:   { icon:'🌸', color:'#E91E8C', label:'Flower' },
   seed:     { icon:'🌰', color:'#FF9800', label:'Seed' }
 };
 const STATUS = {
@@ -1170,9 +1166,8 @@ function parseVoice(txt) {
   name = name.trim().replace(/^\w/, c=>c.toUpperCase());
   const lc = name.toLowerCase();
   if (/tree|oak|maple|apple|pine|birch|cherry|walnut|ash|hemlock|spruce|fir|beech/.test(lc)) pickType('tree');
-  else if (/seed|wildflower/.test(lc)) pickType('seed');
-  else if (/flower|heart|lily|rose|tulip|daisy|lavender|echinacea|peony|iris|aster|fern/.test(lc)) pickType('flower');
   else if (/root|shrub|bush|berry|bramble|currant|blueberry|raspberry|elderberry/.test(lc)) pickType('bareroot');
+  else if (/seed|flower|wildflower|heart|lily|rose|tulip|daisy|lavender|echinacea|peony|iris|aster|fern/.test(lc)) pickType('seed');
   document.getElementById('f-name').value = name;
   document.getElementById('f-qty').value  = qty;
   toast(`Got it: ${qty} × ${name}`);
